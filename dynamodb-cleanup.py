@@ -2,7 +2,7 @@
 
 import argparse
 import boto3
-from boto3.dynamodb.conditions import Key, Attr
+from boto3.dynamodb.conditions import Attr
 from botocore.exceptions import ClientError
 import errno
 import logging
@@ -256,17 +256,26 @@ def run():
         FilterExpression=comparison
     )
 
-    if items_list['Count'] == 0:
-        logger.info('No item to delete.')
+    if items_list['ScannedCount'] == 0:
+        logger.info('No item in the table.')
         return
 
-    while more_items and items_list['Count'] > 0:
+    nbItemsDeleted = 0
+    nbItemsScanned = 0
+
+    while more_items and items_list['ScannedCount'] > 0:
         logger.info(('Reading items from table'
-                     ' \'{}\' ({})').format(parameters.table, more_items))
+                     ' \'{}\' ({}) - {}/{} found').format(
+                    parameters.table,
+                    more_items,
+                    items_list['Count'],
+                    items_list['ScannedCount']))
 
         items.extend(
             dict((name, {'S': item[name]}) for name in table_keys)
             for item in items_list['Items'])
+        nbItemsDeleted += items_list['Count']
+        nbItemsScanned += items_list['ScannedCount']
 
         if 'LastEvaluatedKey' in items_list:
             items_list = manage_db_scan(
@@ -277,17 +286,31 @@ def run():
         else:
             more_items = False
 
-        logger.info('{} items to delete...'.format(len(items)))
-        while len(items) >= const_parameters.dynamodb_max_batch_write or \
-                (not more_items and len(items) > 0):
-            logger.debug('Current number of items to delete: '.format(len(items)))
-            items = table_batch_write(
-                client_ddb,
-                parameters.table,
-                items,
-                'DeleteRequest')
+        if items:
+            logger.info('{} items to be deleted...'.format(len(items)))
+            last_info = int(len(items) / parameters.print_period)
+            while len(items) >= const_parameters.dynamodb_max_batch_write or \
+                    (not more_items and len(items) > 0):
+                logger.debug('Current number of items to delete: '.format(len(items)))
 
-    logger.info('Items deleted.')
+                if last_info != int(len(items) / parameters.print_period):
+                    last_info = int(len(items) / parameters.print_period)
+                    logger.info(('{} items left to delete '
+                                 'in current scan...').format(len(items)))
+
+                items = table_batch_write(
+                    client_ddb,
+                    parameters.table,
+                    items,
+                    'DeleteRequest')
+
+    if nbItemsDeleted == 0:
+        logger.info('No item to delete for {} items scanned.'.format(
+            nbItemsScanned))
+        return
+
+    logger.info('{} items deleted for {} items scanned.'.format(
+        nbItemsDeleted, nbItemsScanned))
 
 
 parser = None
@@ -309,6 +332,12 @@ if __name__ == '__main__':
         choices=('NOTSET', 'DEBUG', 'INFO',
                  'WARNING', 'ERROR', 'CRITICAL'),
         help='Define the specific log level')
+    parser.add_argument(
+        '--print-period',
+        type=int,
+        default=100,
+        help='The number of elements to delete before printing '
+             'an information about the number of elements left to delete')
 
     # Interactive CLI
     parser.add_argument(
@@ -352,11 +381,20 @@ if __name__ == '__main__':
         default='lt',
         help='The comparison operator to use')
     parser.add_argument(
+        '--comparison-type', '--type',
+        default='int',
+        help='The type to use for the comparison value')
+    parser.add_argument(
         '--comparison-value', '--value',
         default=int(time.time() - 86400),
         help='The comparison operator to use')
 
     parameters = parser.parse_args()
+
+    parameters.comparison_type = getattr(
+        __builtins__, parameters.comparison_type)
+    parameters.comparison_value = parameters.comparison_type(
+        parameters.comparison_value)
 
     logging.basicConfig(
         format='%(asctime)s::%(name)s::%(processName)s'
