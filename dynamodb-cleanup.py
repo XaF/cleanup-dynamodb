@@ -314,7 +314,8 @@ def run():
 parser = None
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Load test python script for Mirrors')
+        description='Python script to cleanup a DynamoDB table that matches '
+                    'criteria for a given field')
 
     # Logging options
     parser.add_argument(
