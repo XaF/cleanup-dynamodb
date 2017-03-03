@@ -12,8 +12,6 @@ from socket import error as SocketError
 import sys
 import time
 
-from pprint import pprint
-
 
 class Namespace(object):
     """from dynamodb-bnr"""
