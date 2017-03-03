@@ -339,12 +339,6 @@ if __name__ == '__main__':
         help='The number of elements to delete before printing '
              'an information about the number of elements left to delete')
 
-    # Interactive CLI
-    parser.add_argument(
-        '--interactive',
-        action='store_true',
-        help='Enable the interactive mode')
-
     # AWS general options
     parser.add_argument(
         '--profile',
