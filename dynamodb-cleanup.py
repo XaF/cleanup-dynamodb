@@ -261,6 +261,14 @@ def run():
     nbItemsDeleted = 0
     nbItemsScanned = 0
 
+    if parameters.write_capacity_limit is None:
+        threshold = float('Inf')
+    else:
+        threshold = parameters.write_capacity_limit / const_parameters.dynamodb_max_batch_write
+        logger.info(('Threshold will be {} batch '
+                     'write before sleeping').format(threshold))
+    capacityFactor = 0
+
     while more_items and items_list['ScannedCount'] > 0:
         logger.info(('Reading items from table'
                      ' \'{}\' ({}) - {}/{} found').format(
@@ -301,6 +309,13 @@ def run():
                     parameters.table,
                     items,
                     'DeleteRequest')
+                capacityFactor += 1
+
+                if capacityFactor >= threshold:
+                    capacityFactor = 0
+                    logger.info(('Threshold ({}) reached; '
+                                 'sleeping 1 second.').format(threshold))
+                    time.sleep(1)
 
     if nbItemsDeleted == 0:
         logger.info('No item to delete for {} items scanned.'.format(
@@ -381,6 +396,12 @@ if __name__ == '__main__':
         '--comparison-value', '--value',
         default=int(time.time() - 86400),
         help='The comparison operator to use')
+    parser.add_argument(
+       '--write-capacity-limit',
+       type=int,
+       default=None,
+       help='The script will pause 1 second every so often in order '
+            'not to go over that write capacity limit per second')
 
     parameters = parser.parse_args()
 
