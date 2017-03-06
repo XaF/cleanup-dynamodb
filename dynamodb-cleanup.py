@@ -395,7 +395,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--comparison-value', '--value',
         default=int(time.time() - 86400),
-        help='The comparison operator to use')
+        help='The comparison value to use')
     parser.add_argument(
        '--write-capacity-limit',
        type=int,
