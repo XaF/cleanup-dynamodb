@@ -179,7 +179,7 @@ def table_batch_write(client, table_name, items, request_type='PutRequest'):
 
     if returnedItems:
         nreturnedItems = len(returnedItems)
-        sleeptime = nreturnedItems * 2
+        sleeptime = int(nreturnedItems * parameters.sleep_factor)
         message = ('Table \'{0}\': {1} item(s) returned during '
                    'batch write; sleeping {2} second(s) to avoid '
                    'congestion').format(
@@ -396,6 +396,14 @@ if __name__ == '__main__':
         '--comparison-value', '--value',
         default=int(time.time() - 86400),
         help='The comparison value to use')
+
+    parser.add_argument(
+       '--sleep-factor',
+       type=float,
+       default=2,
+       help='The factor to apply to the number of items returned for the '
+            'duration to sleep for before resuming cleanup activities '
+            '(default: 2)')
     parser.add_argument(
        '--write-capacity-limit',
        type=int,
